@@ -1,5 +1,5 @@
 # my-project
-11111111111111111111111111
+
 > A Vue.js project
 
 ## Build Setup
@@ -26,8 +26,5 @@ npm run e2e
 # run all tests
 npm test
 ```
-
-注意ontology dapi 依赖项的添加配置，vue的使用方法以及helloworld中的调用链上合约的方法，包括预执行和执行。
-
 
 For a detailed explanation on how things work, check out the [guide](http://vuejs-templates.github.io/webpack/) and [docs for vue-loader](http://vuejs.github.io/vue-loader).
