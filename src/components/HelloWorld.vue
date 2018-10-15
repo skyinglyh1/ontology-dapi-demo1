@@ -4,41 +4,29 @@
     <h2>check to see the total supply</h2>
     <ul class="btns">
       <li class="btn-item clearfix">
-        <div class="lottery-btn" @click="querySupply">
           <p>totalSupply: {{total_supply}} keys</p>
-        </div>
       </li>
       <li class="btn-item clearfix">
-        <div class="lottery-btn" @click="queryFakeSupply">
           <p>fakeTotalSupply: {{fake_total_supply}} fake keys</p>
-        </div>
       </li>
       <li class="btn-item clearfix">
-        <div class="lottery-btn" @click="queryTotalOngBalance">
           <p>totalOngBalance: {{total_ong_balance}} ONG </p>
-        </div>
       </li>
       <li class="btn-item clearfix">
-        <div class="lottery-btn" @click="queryTotalOngForKey">
           <p>totalOngForKey: {{total_ong_for_key}} ONG for key </p>
-        </div>
       </li>
       <li class="btn-item clearfix">
-        <div class="lottery-btn" @click="queryName">
           <p>Name of the game: {{name}} </p>
-        </div>
       </li>
       <li class="btn-item clearfix">
-        <div class="lottery-btn" @click="queryBalanceOf">
           <p>balanceOf this account is : {{balance_of}} keys </p>
-        </div>
       </li>
       <li class="btn-item clearfix">
-        <div class="lottery-btn" @click="buy">
+        <div class="lottery-btn" @click="buy(1000000000, 0)">
           <p>try to buy with 1 ONG </p>
         </div>
         <div class="round-content">
-          <p>Count Round Num: 88888888</p>
+          <p>bought keys amount from return of buy: {{bought_key_amount}}</p>
           <p>Winner Of Last Round: 999999999</p>
         </div>
       </li>
@@ -49,15 +37,17 @@
 <script>
 import {client} from 'ontology-dapi'
 import {Parameter, ParameterType, utils, Crypto} from 'ontology-ts-sdk'
+// import { ParameterTypeVal } from 'ontology-ts-sdk/lib/types/smartcontract/abi/parameter'
 
 const contract = '086b8a1dcd095ec44e98afed1764a9a5f0204146'
-// const gasLimit = 30000
-// const gasPrice = 500
+const gasLimit = 100000
+const gasPrice = 500
 
 export default {
   name: 'HelloWorld',
   data () {
     return {
+      utils: utils,
       total_supply: null,
       fake_total_supply: null,
       total_ong_balance: null,
@@ -68,10 +58,7 @@ export default {
       stake_requirement: null,
       price: null,
       balance_of: null,
-      ong_balance_of: null,
-      referral_balance_of: null,
-      dividend_of: null,
-      direct_referral_of: null
+      bought_key_amount: null
     }
   },
   async mounted () {
@@ -92,6 +79,87 @@ export default {
     clearInterval(this.intervalId)
   },
   methods: {
+    buy(ongAmount, directReferral) {
+      if(!this.provider) {
+        return
+      }
+      this.$confirm({
+        title: `This game needs you input ongAmount and your referral`,
+        content: `You can buy maximum 5 ong worth of keys for players`,
+        okText: `join`,
+        okType: 'Primary',
+        cancelText: 'Not now',
+        onOk: () => {
+          console.log('ongAmount is -- ' + ongAmount + ', directferral is -- ' + directReferral)
+          this.handleBuy(ongAmount, directReferral)
+        },
+      })
+    },
+    async handleBuy(ongAmount, directferral) {
+      let account
+      // get account
+      try{
+        account = await client.api.asset.getAccount()
+        // console.log('fromAccount is -- ' + account)
+      }catch (err) {
+        console.log(err)
+        this.$message.warning('No account found in the provider. Please try again later.')
+        return 'No_ACCOUNT'
+      }
+      
+      const acct = new Crypto.Address(account).serialize()
+      if (directferral) {
+        const directferralByteArray = new Crypto.Address(directferral).serialize()
+      }
+        
+        
+      // invoke
+      const method = 'buy'
+      const parameters = [
+        new Parameter('account', ParameterType.ByteArray, acct),
+        new Parameter('ongAmount', ParameterType.Integer, ongAmount),
+        new Parameter('directReferral', ParameterType.Integer, 0)
+      ]
+      const params = {
+        contract,
+        method,
+        parameters,
+        gasPrice,
+        gasLimit
+      }
+      const result = await this.scInvoke(params, false)
+      if (result) {
+        this.$message.success('You just bought ' + ongAmount + ' ONG worth of tokens')
+      } else {
+        this.$message.error('some error happens in your buy, please try again later')
+      }
+      let res = JSON.stringify(result)
+      console.log('res --- ' + res)
+      let result1 = JSON.parse(res)
+      let result2 = result1.result
+      let txhash = result1.transaction
+      let event1 = result2[result2.length - 1]
+      console.log('result --- ' + event1)
+      console.log('event --- ' + utils.hexstr2str(event1[0]))
+      console.log('address ---(base58) ' + new Crypto.Address(event1[1]).toBase58())
+      console.log('ongAmount --- ' + parseInt(utils.reverseHex(event1[2]), 16) / 10 ** 9)
+      console.log('tokenAmount --- ' + parseInt(utils.reverseHex(event1[3]), 16) / 10 ** 9)
+      const event14 = event1[4]
+      if (event14 == '00') {
+        console.log('null ************')
+      }
+      else {
+        console.log('referredBy ---(base58) ' + new Crypto.Address(event14).toBase58())
+        console.log('something************')
+      }
+      
+      
+      console.log('txhash --- ' + txhash)
+      this.bought_key_amount = parseInt(utils.reverseHex(event1[3]), 16) / 10 ** 9
+      return this.bought_key_amount
+
+    },
+
     async refresh () {
       const supply1 = await this.querySupply()
       const fakeSupply1 = await this.queryFakeSupply()
@@ -106,18 +174,17 @@ export default {
       this.total_ong_balance = parseInt(utils.reverseHex(this.total_ong_balance), 16) / 10 ** 9
       this.total_ong_for_key = parseInt(utils.reverseHex(this.total_ong_for_key), 16) / 10 ** 9
       if (this.total_supply >= 0) {
-        console.log('totalSupply is --- ' + this.total_supply + ' key ')
+        // console.log('totalSupply is --- ' + this.total_supply + ' key ')
       }
       if (this.fake_total_supply >= 0) {
-        console.log('fakeTotalSupply is --- ' + this.fake_total_supply + ' fake key')
+        // console.log('fakeTotalSupply is --- ' + this.fake_total_supply + ' fake key')
       }
       if (this.total_ong_balance >= 0) {
-        console.log('totalOngBalance is --- ' + this.total_ong_balance + ' ONG ')
+        // console.log('totalOngBalance is --- ' + this.total_ong_balance + ' ONG ')
       }
       if (this.total_ong_for_key >= 0) {
-        console.log('totalOngForKey is --- ' + this.total_ong_for_key + ' ONG for key')
+        // console.log('totalOngForKey is --- ' + this.total_ong_for_key + ' ONG for key')
       }
-
 
       const name1 = await this.queryName()
       this.name = utils.hexstr2str(name1)
@@ -126,6 +193,14 @@ export default {
       this.balance_of = balanceOf1 || 0
       this.balance_of = parseInt(utils.reverseHex(this.balance_of), 16) / 10 ** 9
 
+      if (this.name) {
+        // console.log('Name is -- ' + this.name)
+      }
+      if (this.balance_of >= 0) {
+        // console.log('balanceOf is --- ' + this.balance_of + ' keys')
+      }
+      // console.log('bought key amount is -- ' + this.bought_key_amount + 'keys')
+  
 
     },
     async querySupply () {
@@ -187,13 +262,24 @@ export default {
       let account
       try { // get account
         account = await client.api.asset.getAccount()
-        console.log(account)
+        // console.log(account)
       } catch (err) {
         console.log(err)
         this.$message.warning('No account found in the provider. Please prepare an account before joining the game.')
         return 'NO_ACCOUNT'
       }
       const acct = new Crypto.Address(account).serialize()
+      // console.log('account in queryBalanceOf --- ' + acct)
+      // let some = "00"
+      // if (some == "00") {
+      //   let acctBase58 = new Crypto.Address(some).toBase58()
+      //   console.log('account in queryBalanceOf (base58)--- ' + acctBase58)
+      //   console.log('yes account')
+      // } else {
+      //   console.log('no account')
+      // }
+      
+
       const method = 'balanceOf'
       const parameters = [
         new Parameter('acct', ParameterType.ByteArray, acct)
@@ -219,11 +305,11 @@ export default {
         } else {
           result = await client.api.smartContract.invoke(params)
         }
-        console.log('onScCall finished, result:' + JSON.stringify(result))
+        // console.log('onScCall finished, result:' + JSON.stringify(result))
         return result
       } catch (e) {
         console.log('onScCall error:', e)
-        this.$message.error('Some error happens. Please try later.')
+        // this.$message.error('Some error happens. Please try later.')
         return null
       }
     }

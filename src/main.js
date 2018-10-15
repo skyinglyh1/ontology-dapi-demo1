@@ -5,6 +5,7 @@ import App from './App'
 import router from './router'
 import {Button, message, Modal} from 'ant-design-vue'
 import { client } from 'ontology-dapi'
+import {} from 'ontology-ts-sdk'
 
 client.registerClient({})
 
